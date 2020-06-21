@@ -4,9 +4,9 @@ const ejs = require("ejs");
 const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-const md5 = require("md5");
+const bcrypt = require("bcrypt");
 
-
+const saltRounds = 10;
 const app = express();
 app.set("view engine", "ejs");
 app.use(express.static("public"));
@@ -32,14 +32,20 @@ app.route("/login")
         res.render("login");
     })
     .post(function (req, res) {
-        User.findOne({ email: req.body.username}, function (err, foundUser) {
+        User.findOne({ email: req.body.username }, function (err, foundUser) {
             if (!err) {
                 if (foundUser != undefined) {
-                    if (foundUser.password === md5(req.body.password)) {
-                        res.render("secrets");
-                    } else {
-                        res.send("Uncorrect password");
-                    } 
+                    const hash = foundUser.password;
+                    bcrypt.compare(req.body.password, hash, function (err, result) {
+                        if (!err) {                      
+                            if (result) {
+                                res.render("secrets");
+                            }
+                            else {
+                                res.send("Uncorrect password");
+                            }
+                        }
+                    });
                 } else {
                     res.send("No user")
                 }
@@ -56,18 +62,21 @@ app.route("/register")
 
     .post(function (req, res) {
         const email = req.body.username;
-        const password = md5(req.body.password);
-        const newUser = new User({
-            email: email,
-            password: password
-        })
-        newUser.save(function (err) {
-            if (!err) {
-                res.render("secrets");
-            } else {
-                console.log(err);
-            }
+        const password = req.body.password;
+        bcrypt.hash(password, saltRounds, function (err, hash) {
+            const newUser = new User({
+                email: email,
+                password: hash
+            })
+            newUser.save(function (err) {
+                if (!err) {
+                    res.render("secrets");
+                } else {
+                    console.log(err);
+                }
+            });
         });
+
     })
 
 
